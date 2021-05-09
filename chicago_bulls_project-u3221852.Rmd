@@ -1,0 +1,418 @@
+---
+title: "Chicago Bulls Team Analysis"
+author: "Ryan Ahchee"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1. Introduction
+
+### Description
+The Chicago Bulls are a team that competes in the NBA (National Basketball Association). In the most recent NBA season they placed 27th out of 30 (based on win-loss record).
+
+The task by the general manager of Chicago Bulls is to find the best five starting players (one from each position) your team can afford but still having the ability to fill a full team roster. For the purpose of this task, we are focused on finding five starting players and can include players already on the Chicago Bulls roster. 
+
+The restriction for this task are that the team's budget for player contracts next season is 118 million, ranked 26th out of 30. For context, the team with the highest payroll budget is Portland with 148 million, while the best performing team was Milwaukee Bucks (who clinched the best league record in 2018-19) with $131 million. 
+
+
+### Background on Key Basketball Metrics
+
+The basics of basket ball is to score more points than the opposition. Throughout this report we will reference the Olivers Four Factors [https://www.basketball-reference.com/about/factors.html]. 
+
+Reference: 1. Squared Statistics: Understanding Basketball Analytics. (2017). Introduction to Oliver’s Four Factors. Available at: https://goo.gl/PXJiUw [Accessed 09 May. 2021].
+
+The basic premise of this is that there are four effective ways to win more basketball games. The four factors are:
+* to score efficiently
+* protect the basketball on offense
+* grab as many rebounds as possible
+* and get to the foul line as often as possible. 
+
+Each of these elements are closely related to the termination of a possession for a team. Oliver expands this to metrics.
+
+* Shooting: measured in effective field goal percentage (eFG%)
+* Turnovers: measured in turnover percentage (TOV%)
+* Rebounding: measured in offensive and defensive rebounding percentage (ORB% and DRB%)
+* Free throws,: measured in free throw rate (FTR)
+
+We will use these as a starting point using basic data analysis techniques for exploring, describing and summarizing data in order to provide recommendation on the best stating players for the Chicago Bull NBA team with a $118M salary cap.
+
+
+### Aim of Project
+Provide recommendations to to General Manager on best recruitment players for the Chicago Bulls starting team by using basic data analysis techniques for exploring, describing and summarising data.
+
+
+# 2. Reading and cleaning data
+## Load required packages
+
+```{r packages, message=FALSE}
+library(tidyverse) # include all required packages at the start
+library(tidyr)
+library(broom)
+library(dplyr)
+library(magrittr)
+library(knitr)
+```
+
+## Data source
+
+The data used in this document contains match data form the National Basketball League for season 2018-19. 
+
+The sources are refernces below:
+1. 2018-19_nba_player-statistics.csv : sourced from[basketball-reference.com](www.basketball-reference.com)
+2. 2018-19_nba_player-salaries.csv  :sourced from [hoopshype.com/salaries](www.hoopshype.com/salaries)
+3. 2019-20_nba_team-payroll.csv : sourced from [hoopshype.com/salaries](www.hoopshype.com/salaries)
+4. 2018-19_nba_team-statistics_1.csv : sourced from [basketball-reference.com](www.basketball-reference.com)
+5. 2018-19_nba_team-statistics_2.csv : sourced from [basketball-reference.com](www.basketball-reference.com)
+
+A description of all data variable descriptions can be found at in the `README.rmd`
+
+## Read data
+
+Read in the all data using file using the `read.csv()` function from the `readr` package. 
+
+```{r read_data, message=FALSE} 
+
+# data dir should be in the raw working dirictory
+
+# read in player stats 1
+df_player <- read.csv("data/raw/2018-19_nba_player-statistics.csv")
+
+# read in player salaries 
+df_player_salaries <- read.csv("data/raw/2018-19_nba_player-salaries.csv")
+
+# read in team stats 1
+df_team_stats_1 <- read.csv("data/raw/2018-19_nba_team-statistics_1.csv")
+
+# read in team stats 1
+df_team_stats_2 <- read.csv("data/raw/2018-19_nba_team-statistics_2.csv")
+
+# read team payroll data
+df_team_payroll <- read.csv("data/raw/2019-20_nba_team-payroll.csv")
+```
+
+## Checking the Data & Exploratory  Analysis
+
+Check the structure of the data file using `str()`:
+
+```{r structure}
+str(df_player)
+str(df_player_salaries)
+str(df_team_stats_1)
+str(df_team_stats_2)
+str(df_team_payroll)
+```
+
+Check the first 6 rows of the data file using `head()`
+
+```{r head}
+head(df_player)
+head(df_player)
+head(df_player_salaries)
+head(df_team_stats_1)
+head(df_team_stats_2)
+head(df_team_payroll)
+```
+
+Check the last 6 rows of the data file using `tail()`
+
+```{r tail}
+tail(df_player)
+tail(df_player_salaries)
+tail(df_team_stats_1)
+tail(df_team_stats_2)
+tail(df_team_payroll)
+```
+
+Check for missing values from the player data.
+
+```{r na}
+sum(is.na(df_player)) # count the missing values
+head(which(is.na(df_player), arr.ind = TRUE)) # find where the missing values are (showing only first 6 rows)
+```
+
+The missing values all appear to be when a when a player has not taken a `FG` shot and then carries over to any variable relating to FG such as `3P%` `2P%` etc.
+
+### Visualise missing data
+```{r view_missing_data}
+naniar::vis_miss(df_player)
+```
+
+In this instance we can leave the na as converting to 0 will be inaccurate and the proportion of na data is 0.6% of all data. 
+
+### Join Player Statistics to Player Data
+Since our budget is a major factor in selecting our starting roster we are going to join the player salaries to the player statistics table.
+
+### Join Salary data to player data using left_join.
+```{r join_salary}
+df_player <- left_join(df_player, df_player_salaries, by = "player_name") # join salary to player statistics
+```
+
+### Check salaries have been added
+```{r head_salary}
+head(df_player)
+```
+
+We can also join the team stats data togeather for ease of use. We will join by Team.
+```{r join_team_stats}
+df_team_stats_combined <- left_join(df_team_stats_1, df_team_stats_2, by = "Team") # join data
+```
+
+Note: We can't join the team salaries with the team statistics as team names are not in the same format.
+
+
+## Data Exploratory & Modeling
+
+In order to find the best 5 starting roster we need to understand why teams win. According to the four factor method the team that is the most efficient is more likely to win based on the observations discussed earlier. Lets check `eFG.`. against `W` to start with.
+
+In basketball, effective field goal percentage (abbreviated `eFG.`) is a statistic that adjusts field goal percentage to account for the fact that three-point field goals count for three points while field goals only count for two points. Its goal is to show what field goal percentage a two-point shooter would have to shoot at to match the output of a player who also shoots three-pointers.
+
+Reference 2 - `eFG.` reference [here](https://en.wikipedia.org/wiki/Effective_field_goal_percentage#:~:text=From%20Wikipedia%2C%20the%20free%20encyclopedia,only%20count%20for%20two%20points)
+
+Is there a relationship between `eFG.` and `W`?
+
+### Lets plot eFG. vs Wins.
+```{r eFG_vs_Wins}
+ggplot(data = df_team_stats_combined, aes(x = eFG., y = W)) +
+geom_point(colour = "dodgerblue") +
+geom_smooth(method = "lm", colour = "magenta", se = FALSE)
+```
+
+There looks to be reasonably strong positive relationship between eFG & wins. Lets continue checking data.
+
+### Check the co-efficent of variation
+```{r co-efficent_of_variation}
+with(df_team_stats_combined, cor(x = eFG., y = W))
+```
+
+[1] 0.7818644 indicates a strong positive relationship between Wins and eFG percentage.
+
+### Check whether the `eFG.` percentage influences `W`
+```{r does_eFG_influence_wins}
+fit <- lm(eFG. ~ W, data = df_team_stats_combined)
+tidy(fit, conf.int = TRUE)
+```
+
+
+```{r summary}
+summary(fit)
+```
+
+R-squared =  0.5974, meaning that 59.7% of the variance in wins is explained by the variance in eFG.
+
+The slope coefficient = 0.0009, meaning that for every 1 unit that eFG% is increased, the expected win percentage increases by 0.0009%.
+
+### Test Independence
+```{r test_independence}
+car::durbinWatsonTest(fit)
+```
+The result is 2.001 which ensures independence. 
+
+
+### Outliers
+
+```{r check_outliers}
+std_res <- rstandard(fit)
+points <- 1:length(std_res)
+```
+
+### Plot Outliers
+```{r plot_outliers}
+ggplot(data = NULL, aes(x = points, y = std_res)) +
+geom_point() +
+ylim(c(-4,4)) +
+geom_hline(yintercept = c(-3, 3), colour = "red", linetype = "dashed")
+```
+
+All data is within 3 standard deviations so there doesn't appear to be any outliers.
+
+### Determine leverage points
+```{r leverage_points}
+hats <- hatvalues(fit)
+```
+
+### Plot Leverage Points
+```{r plot_leverage_points}
+ggplot(data = NULL, aes(x = points, y = hats)) +
+geom_point()
+```
+
+There are no hat values greater than 1, we might investigate the points above 0.12 as these seem to stand out. 
+
+### Check for Homoscedasticity
+```{r check_for_homscedacity}
+res <- residuals(fit)
+fitted <- predict(fit)
+```
+
+### Plot Homoscedacity
+```{r plot_homoscedacity}
+ggplot(data = NULL, aes(x = fitted, y = res)) +
+geom_point(colour = "dodgerblue") + 
+geom_hline(yintercept = 0, colour = "red", linetype = "dashed")
+```
+
+Heteroscedasticity doesn't appear to be evident.
+
+### Check for Normality
+```{r normailty}
+ggplot(data = NULL, aes(x = res)) +
+geom_histogram(colour = "black", fill = "dodgerblue", bins = 30)
+```
+
+The data appears to be normally distributed.
+
+
+## Summary
+* **The higher the team eFG% the more likely a team is going to win. The R-squared value of 59.1% indicates the data fits the model.**
+* **There are other variables that determine W and must be investigated.** 
+* **We should get more data though to be more confident in our model.**
+
+
+### Checking other variables 
+
+### Pick up all Rebounds
+If a team cannot score on every possession, then the optimal task is to grab every miss and give the team a second-chance opportunity. An offensive rebound extends a possession and allows for a second attempt at a field goal. This is effectively when teams get another chance to score.
+
+To measure the quality of a team’s ability to rebound, we compute the offensive rebounding percentage `ORB%`. This quantity is calculated as the number of offensive rebounds divided by the number of available rebounds after a missed field goal attempt.
+
+```{r ORB_vs_wins}
+ggplot(data = df_team_stats_combined, aes(x = ORB, y = W)) +
+geom_point(colour = "dodgerblue") +
+geom_smooth(method = "lm", colour = "magenta", se = FALSE)
+```
+
+There looks to be a weak positive relationship vs ORB. For the purpose of this analysis we will not use this as an effective variable to recruit new players.
+
+### Free throw
+The next way to score points other than scoring a field goal or giving the team a second opportunity is to get to the foul line. 
+
+```{r FT_FTB_vs_wins}
+ggplot(data = df_team_stats_combined, aes(x = FT.FGA, y = W)) +
+geom_point(colour = "dodgerblue") +
+geom_smooth(method = "lm", colour = "magenta", se = FALSE)
+```
+
+Again, there looks to be only a weak positive relationship between FT.FGA and points per game
+
+### Protect the Ball
+The final step of the four factors is to ensure that teams don’t turn the ball over. This is a simple measurement called turnover percentage `TO%`. This measure is simply to calculate the percentage of possessions that ended in a turnover. The smaller the number the better.
+
+```{r FT.FTB_vs_wins}
+ggplot(data = df_team_stats_combined, aes(x = TOV., y = W)) +
+geom_point(colour = "dodgerblue") +
+geom_smooth(method = "lm", colour = "magenta", se = FALSE)
+```
+
+There seems to be some realtionship present. Lets have a look at the correlation co-efficient to confirm how these are related.
+
+```{r co-efficent_of_variation_2}
+with(df_team_stats_combined, cor(x = TOV., y = W))
+```
+
+[1] -0.3068775 the co-efficient of variation there is only a moderate to low correlation so we will not use this as a factor to recruit.
+
+
+In summary it seems as though the most positive relationship on the variables we have checked appear to be effective field goal percentage. 
+
+
+Lets turn back to our player statistics.
+
+## Player Satistics
+As previusly discussed we know that `eFG.` has a influence on wins. In the next section we will try to wrangle the data to work out best players to recruit using the variable `eFG.`.
+
+
+### Removing Duplicates from player who have played for more than one team.
+
+Player names appear more than once if they have been traded so we need to remove the duplicates. For ease of use we have only kept distinct valves for player who are traded although this may not be best practice.
+
+```{r keep_distinct_players}
+df_player_1 <- df_player %>% 
+distinct(player_name, .keep_all = TRUE)
+```
+
+Note: The formula below was tried below but errors kept occurring and I wasn't sure how to fix it.
+
+df_player_1 <- aggregate(df_player[,5:31], list(df_player$player_name), FUN = sum)
+
+### View data when distinct players are kept.
+
+We have 530 observations now and it appears as though duplicates have been removed.
+
+### Removing players with small sample sizes
+First lets filter the data to remove to remove players who have had small minutes `MP` and as we are looking at starting players we have removed players players who started in less than 10 games `GS`. 
+
+Since we are looking at `eFG.` we are also going to remove anyone who has had less than 100 FGA field goal attempts as this is a function of `eFG.`. Removing these will allow us to get somewhat more accurate data. we are going to write this to a new table called `df_player_1_filtered` df_player_1_filtered.
+
+```{r removing_small_data_samples}
+df_player_1_filtered <- df_player_1 %>%
+filter(GS > 10, MP > 100, FGA > 100)
+```
+
+```{r check-new_table_2}
+head(df_player_1_filtered)
+```
+
+
+```{r check-new_table}
+str(df_player_1_filtered)
+```
+
+Lets print the players by position including the only necessary variables.
+
+Lets look at the Centre with the highest `eFG.`
+```{r C_by_eFG}
+df_player_1_filtered %>%
+filter( Pos == "C") %>%
+arrange(desc(eFG.)) %>%
+select(player_name, Pos, eFG., salary)
+```
+
+Lets look at the Power Forward with the highest .eFG.
+```{r PF_by_eFG}
+df_player_1_filtered %>%
+filter( Pos == "PF") %>%
+arrange(desc(eFG.)) %>%
+select(player_name, Pos, eFG., salary)
+```
+
+Lets look at the Shooting Guard with the highest .eFG.
+```{r SG_by_eFG}
+df_player_1_filtered %>%
+filter( Pos == "SG") %>%
+arrange(desc(eFG.)) %>%
+select(player_name, Pos, eFG., salary)
+```
+
+Lets look at the Point Guard with the highest .eFG.
+```{r PG_by_eFG}
+df_player_1_filtered %>%
+filter( Pos == "PG") %>%
+arrange(desc(eFG.)) %>%
+select(player_name, Pos, eFG., salary)
+```
+
+```{r SF_by_eFG}
+df_player_1_filtered %>%
+filter( Pos == "SF") %>%
+arrange(desc(eFG.)) %>%
+select(player_name, Pos, eFG., salary)
+```
+
+
+# 5.Final Recommendations
+
+
+To discover players that had a greater impact on winning we used the four factors model that references 4 variables. During the exploratory analysis phase we saw that .eFG% had the greatest impact on wining games and thus it was used as the main variable in our analysis. We can see that this statistic can sometimes be underrated vs salary as you can see in the instance of Danuel House.
+
+
+## Mitchell Robinson - Centre -  Salary - $1485440
+## Stephen Curry	- Point Guard $37457154	
+## Danny Green	 - Point Guard	$10000000	
+## Danuel House	- Small Forward	- $247827
+## Davis Bertans - Power Forward	- $7000000
+
+
+6. In report
